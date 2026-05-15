@@ -185,7 +185,7 @@ export default function DashboardPage() {
             type="info"
             showIcon
             message="Partial data"
-            description="Media count or active schedules could not be loaded; demo numbers are used for those two cards only."
+            description="Some dashboard sources failed (media/schedules counts, screen list, or per-screen event/playback logs). Summary cards use analytics where possible; alerts and activities may show aggregate fallbacks."
             style={{ marginBottom: 16 }}
           />
         ) : null}

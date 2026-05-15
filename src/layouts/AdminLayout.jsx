@@ -10,7 +10,9 @@ import {
   PictureOutlined,
   LogoutOutlined,
 } from '@ant-design/icons'
-import { Link, Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
+import { useAuth } from '../auth/AuthProvider'
+import { getStoredUsername } from '../services/authService'
 
 const { Header, Sider, Content } = Layout
 
@@ -44,11 +46,10 @@ const MENU_ITEMS = [
 
 export default function AdminLayout() {
   const location = useLocation()
-  const navigate = useNavigate()
+  const { isAuthenticated, logout } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
 
-  const authed = Boolean(localStorage.getItem('ds_admin_token'))
-  if (!authed) return <Navigate to="/login" replace />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
 
   const selectedKeys = useMemo(() => {
     const match = MENU_ITEMS.find((item) =>
@@ -149,16 +150,9 @@ export default function AdminLayout() {
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Typography.Text type="secondary" style={{ fontSize: 13 }}>
-              {localStorage.getItem('ds_admin_username')?.trim() || 'User'}
+              {getStoredUsername() || 'User'}
             </Typography.Text>
-            <Button
-              icon={<LogoutOutlined />}
-              onClick={() => {
-                localStorage.removeItem('ds_admin_token')
-                localStorage.removeItem('ds_admin_username')
-                navigate('/login', { replace: true })
-              }}
-            >
+            <Button icon={<LogoutOutlined />} onClick={logout}>
               Logout
             </Button>
           </div>

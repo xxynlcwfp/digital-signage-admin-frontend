@@ -1,5 +1,6 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../../auth/AuthProvider'
 import {
   Alert,
   Button,
@@ -33,6 +34,7 @@ const ORG_CODE_PATTERN = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const { ready, isAuthenticated, setAuthenticated } = useAuth()
   const [loginForm] = Form.useForm()
   const [registerForm] = Form.useForm()
   const [verifyForm] = Form.useForm()
@@ -48,6 +50,12 @@ export default function LoginPage() {
   const [registerError, setRegisterError] = useState('')
   const [verifyError, setVerifyError] = useState('')
 
+  useEffect(() => {
+    if (ready && isAuthenticated) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [ready, isAuthenticated, navigate])
+
   const onLoginFinish = useCallback(
     async (values) => {
       setLoginError('')
@@ -58,12 +66,7 @@ export default function LoginPage() {
           password: values.password,
         })
         if (data?.accessToken) {
-          localStorage.setItem('ds_admin_token', data.accessToken)
-          if (data?.username) {
-            localStorage.setItem('ds_admin_username', String(data.username).trim())
-          } else {
-            localStorage.removeItem('ds_admin_username')
-          }
+          setAuthenticated(true)
           navigate('/dashboard', { replace: true })
           return
         }
@@ -74,7 +77,7 @@ export default function LoginPage() {
         setLoginLoading(false)
       }
     },
-    [navigate],
+    [navigate, setAuthenticated],
   )
 
   const onRegisterFinish = useCallback(
