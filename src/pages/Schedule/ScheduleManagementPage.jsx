@@ -273,13 +273,16 @@ export default function ScheduleManagementPage() {
     void loadPlaylists()
   }
 
-  const openEdit = (record) => {
-    setEditing(record)
-    setFormError('')
-    setOpen(true)
-    form.setFieldsValue(scheduleToFormValues(record))
-    void loadPlaylists()
-  }
+  const openEdit = useCallback(
+    (record) => {
+      setEditing(record)
+      setFormError('')
+      setOpen(true)
+      form.setFieldsValue(scheduleToFormValues(record))
+      void loadPlaylists()
+    },
+    [form, loadPlaylists],
+  )
 
   const onSubmit = async () => {
     setFormError('')
@@ -316,24 +319,27 @@ export default function ScheduleManagementPage() {
     }
   }
 
-  const onDelete = (record) => {
-    Modal.confirm({
-      title: 'Confirm delete schedule?',
-      content: record.name,
-      okText: 'Delete',
-      okButtonProps: { danger: true },
-      cancelText: 'Cancel',
-      onOk: async () => {
-        try {
-          await deleteSchedule(record.id)
-          message.success('Schedule deleted')
-          await loadSchedules()
-        } catch (e) {
-          message.error(getScheduleApiErrorMessage(e))
-        }
-      },
-    })
-  }
+  const onDelete = useCallback(
+    (record) => {
+      Modal.confirm({
+        title: 'Confirm delete schedule?',
+        content: record.name,
+        okText: 'Delete',
+        okButtonProps: { danger: true },
+        cancelText: 'Cancel',
+        onOk: async () => {
+          try {
+            await deleteSchedule(record.id)
+            message.success('Schedule deleted')
+            await loadSchedules()
+          } catch (e) {
+            message.error(getScheduleApiErrorMessage(e))
+          }
+        },
+      })
+    },
+    [loadSchedules],
+  )
 
   const columns = useMemo(
     () => [
@@ -412,7 +418,7 @@ export default function ScheduleManagementPage() {
         ),
       },
     ],
-    [canMutate, layoutMap, openDetail, playlistMap, resolveTargetDisplay],
+    [canMutate, layoutMap, onDelete, openDetail, openEdit, playlistMap, resolveTargetDisplay],
   )
 
   return (

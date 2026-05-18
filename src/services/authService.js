@@ -383,7 +383,7 @@ export async function login(payload) {
     persistSession(data)
     return data
   } catch (e) {
-    throw new Error(getApiErrorMessage(e))
+    throw new Error(getApiErrorMessage(e), { cause: e })
   }
 }
 
@@ -415,7 +415,7 @@ export async function registerOrganization(payload) {
     const res = await authApi.post('/api/admin/auth/register', body, { skipAuthRefresh: true })
     return unwrapApiResponse(res)
   } catch (e) {
-    throw new Error(getApiErrorMessage(e))
+    throw new Error(getApiErrorMessage(e), { cause: e })
   }
 }
 
@@ -431,6 +431,6 @@ export async function verifyEmail(payload) {
     )
     return unwrapApiResponse(res)
   } catch (e) {
-    throw new Error(getApiErrorMessage(e))
+    throw new Error(getApiErrorMessage(e), { cause: e })
   }
 }

@@ -207,7 +207,11 @@ async function fetchRecentAlerts(screens) {
     .flatMap((r) => r.value)
     .sort((a, b) => b._sort - a._sort)
     .slice(0, MAX_RECENT_ALERTS)
-    .map(({ _sort, ...row }) => row)
+    .map((row) => {
+      const rest = { ...row }
+      delete rest._sort
+      return rest
+    })
 
   return { rows, failed }
 }
@@ -247,7 +251,11 @@ async function fetchRecentActivities(screens) {
     .flatMap((r) => r.value)
     .sort((a, b) => b._sort - a._sort)
     .slice(0, MAX_RECENT_ACTIVITIES)
-    .map(({ _sort, ...row }) => row)
+    .map((row) => {
+      const rest = { ...row }
+      delete rest._sort
+      return rest
+    })
 
   return { rows, failed }
 }

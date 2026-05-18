@@ -56,8 +56,6 @@ export default function AdminLayout() {
   const { isAuthenticated, logout } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
 
-  if (!isAuthenticated) return <Navigate to="/login" replace />
-
   const menuItems = useMemo(
     () => (canManageUsers() ? [...BASE_MENU_ITEMS, ADMIN_MENU_ITEM] : BASE_MENU_ITEMS),
     [],
@@ -71,6 +69,8 @@ export default function AdminLayout() {
     )
     return [match?.key || '/dashboard']
   }, [location.pathname, menuItems])
+
+  if (!isAuthenticated) return <Navigate to="/login" replace />
 
   return (
     <Layout style={{ minHeight: '100vh' }}>

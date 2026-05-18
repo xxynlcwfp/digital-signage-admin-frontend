@@ -17,5 +17,19 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // Data-fetch-on-mount is standard in this app; the rule flags most loadX() effects.
+      'react-hooks/set-state-in-effect': 'off',
+      'react-refresh/only-export-components': [
+        'error',
+        { allowExportNames: ['useAuth', 'mapApiMediaItem'] },
+      ],
+    },
+  },
+  {
+    files: ['vite-plugin-oss-dev-relay.js'],
+    languageOptions: {
+      globals: globals.node,
+    },
   },
 ])

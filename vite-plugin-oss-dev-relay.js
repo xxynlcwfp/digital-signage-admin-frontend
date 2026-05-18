@@ -1,5 +1,6 @@
 import http from 'node:http'
 import https from 'node:https'
+import { Buffer } from 'node:buffer'
 import { randomUUID } from 'node:crypto'
 
 const SESSION_MAX_BYTES = 512 * 1024
