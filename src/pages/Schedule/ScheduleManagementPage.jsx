@@ -39,6 +39,8 @@ import {
   listSchedules,
   updateSchedule,
 } from '../../services/scheduleService'
+import { canWrite, getStoredRole } from '../../services/authService'
+import { isViewerRole } from '../../utils/permissions'
 
 const STATUS_META = {
   [SCHEDULE_STATUSES.ACTIVE]: { color: 'green', label: 'Active' },
@@ -100,6 +102,7 @@ function targetLabel(targetType) {
 }
 
 export default function ScheduleManagementPage() {
+  const canMutate = canWrite()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -390,22 +393,26 @@ export default function ScheduleManagementPage() {
             <Button size="small" icon={<EyeOutlined />} onClick={() => openDetail(record.id)}>
               View
             </Button>
-            <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-              Edit
-            </Button>
-            <Button
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => onDelete(record)}
-            >
-              Delete
-            </Button>
+            {canMutate ? (
+              <>
+                <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+                  Edit
+                </Button>
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => onDelete(record)}
+                >
+                  Delete
+                </Button>
+              </>
+            ) : null}
           </Space>
         ),
       },
     ],
-    [layoutMap, openDetail, playlistMap, resolveTargetDisplay],
+    [canMutate, layoutMap, openDetail, playlistMap, resolveTargetDisplay],
   )
 
   return (
@@ -425,9 +432,11 @@ export default function ScheduleManagementPage() {
             <Button icon={<ReloadOutlined />} onClick={loadSchedules} loading={loading}>
               Refresh
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-              Create schedule
-            </Button>
+            {canMutate ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                Create schedule
+              </Button>
+            ) : null}
           </Space>
         </Space>
 
@@ -443,6 +452,20 @@ export default function ScheduleManagementPage() {
                 Retry
               </Button>
             }
+          />
+        ) : null}
+
+        {!loadError && !loading && items.length === 0 ? (
+          <Alert
+            type="info"
+            showIcon
+            message="No schedules yet"
+            description={
+              isViewerRole(getStoredRole())
+                ? 'Your organization has no schedules. Viewers cannot create schedules; ask an administrator or editor to add them.'
+                : 'Create a schedule with “Create schedule” above.'
+            }
+            style={{ marginBottom: 16 }}
           />
         ) : null}
 
@@ -666,7 +689,7 @@ export default function ScheduleManagementPage() {
           <Button key="close" onClick={() => setDetailOpen(false)}>
             Close
           </Button>,
-          detail?.id != null ? (
+          detail?.id != null && canMutate ? (
             <Button
               key="edit"
               type="primary"

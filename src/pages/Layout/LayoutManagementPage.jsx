@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Button, Card, Divider, Input, Modal, Space, Spin, Table, Tag, Typography, message } from 'antd'
+import { Alert, Button, Card, Divider, Input, Modal, Space, Spin, Table, Tag, Typography, message } from 'antd'
 import {
   DeleteOutlined,
   EditOutlined,
@@ -17,6 +17,8 @@ import {
   toUpdateLayoutRequest,
   updateLayout,
 } from '../../services/layoutService'
+import { canWrite, getStoredRole } from '../../services/authService'
+import { isViewerRole } from '../../utils/permissions'
 
 function statusMeta(status) {
   const s = typeof status === 'string' ? status : String(status || '')
@@ -141,6 +143,7 @@ function LayoutPreviewCanvas({ layout }) {
 }
 
 export default function LayoutManagementPage() {
+  const canMutate = canWrite()
   const navigate = useNavigate()
   const [keyword, setKeyword] = useState('')
   const [items, setItems] = useState([])
@@ -223,69 +226,73 @@ export default function LayoutManagementPage() {
             <Button size="small" icon={<EyeOutlined />} onClick={() => openPreview(record)}>
               View
             </Button>
-            <Button
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => navigate(`/layouts/editor?id=${record.id}`)}
-            >
-              Edit
-            </Button>
-            <Button
-              size="small"
-              type="primary"
-              icon={<UploadOutlined />}
-              disabled={String(record.status) === 'PUBLISHED'}
-              onClick={() => {
-                Modal.confirm({
-                  title: 'Publish this layout?',
-                  content: record.name,
-                  okText: 'Publish',
-                  cancelText: 'Cancel',
-                  onOk: async () => {
-                    try {
-                      const latest = await getLayout(record.id)
-                      await updateLayout(record.id, toUpdateLayoutRequest(latest, { status: 'PUBLISHED' }))
-                      message.success('Published')
-                      await loadLayouts()
-                    } catch (e) {
-                      message.error(getApiErrorMessage(e))
-                      return Promise.reject(e)
-                    }
-                  },
-                })
-              }}
-            >
-              Publish
-            </Button>
-            <Button
-              size="small"
-              danger
-              icon={<DeleteOutlined />}
-              onClick={() => {
-                Modal.confirm({
-                  title: 'Delete this layout?',
-                  content: record.name,
-                  okText: 'Delete',
-                  okButtonProps: { danger: true },
-                  cancelText: 'Cancel',
-                  onOk: async () => {
-                    try {
-                      await deleteLayout(record.id)
-                      message.success('Deleted')
-                      await loadLayouts()
-                    } catch (e) {
-                      message.error(getApiErrorMessage(e))
-                      return Promise.reject(e)
-                    }
-                  },
-                })
-              }}
-            />
+            {canMutate ? (
+              <>
+                <Button
+                  size="small"
+                  icon={<EditOutlined />}
+                  onClick={() => navigate(`/layouts/editor?id=${record.id}`)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<UploadOutlined />}
+                  disabled={String(record.status) === 'PUBLISHED'}
+                  onClick={() => {
+                    Modal.confirm({
+                      title: 'Publish this layout?',
+                      content: record.name,
+                      okText: 'Publish',
+                      cancelText: 'Cancel',
+                      onOk: async () => {
+                        try {
+                          const latest = await getLayout(record.id)
+                          await updateLayout(record.id, toUpdateLayoutRequest(latest, { status: 'PUBLISHED' }))
+                          message.success('Published')
+                          await loadLayouts()
+                        } catch (e) {
+                          message.error(getApiErrorMessage(e))
+                          return Promise.reject(e)
+                        }
+                      },
+                    })
+                  }}
+                >
+                  Publish
+                </Button>
+                <Button
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => {
+                    Modal.confirm({
+                      title: 'Delete this layout?',
+                      content: record.name,
+                      okText: 'Delete',
+                      okButtonProps: { danger: true },
+                      cancelText: 'Cancel',
+                      onOk: async () => {
+                        try {
+                          await deleteLayout(record.id)
+                          message.success('Deleted')
+                          await loadLayouts()
+                        } catch (e) {
+                          message.error(getApiErrorMessage(e))
+                          return Promise.reject(e)
+                        }
+                      },
+                    })
+                  }}
+                />
+              </>
+            ) : null}
           </Space>
         ),
       },
     ],
-    [loadLayouts, navigate],
+    [canMutate, loadLayouts, navigate],
   )
 
   return (
@@ -302,11 +309,27 @@ export default function LayoutManagementPage() {
             <Button icon={<ReloadOutlined />} onClick={() => loadLayouts()} loading={loading}>
               Refresh
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/layouts/editor')}>
-              Create Layout
-            </Button>
+            {canMutate ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/layouts/editor')}>
+                Create Layout
+              </Button>
+            ) : null}
           </Space>
         </Space>
+
+        {!loading && items.length === 0 ? (
+          <Alert
+            type="info"
+            showIcon
+            message="No layouts yet"
+            description={
+              isViewerRole(getStoredRole())
+                ? 'Your organization has no layouts. Viewers cannot create or edit layouts; ask an administrator or editor to add them.'
+                : 'Create a layout with “Create Layout” above.'
+            }
+            style={{ marginBottom: 16 }}
+          />
+        ) : null}
 
         <Card
           variant="borderless"

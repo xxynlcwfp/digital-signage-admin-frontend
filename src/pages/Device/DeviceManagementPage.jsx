@@ -42,6 +42,8 @@ import {
   updateScreen,
   updateScreenGroup,
 } from '../../services/deviceService'
+import { canWrite, getStoredRole } from '../../services/authService'
+import { isViewerRole } from '../../utils/permissions'
 
 function formatStatus(status) {
   const map = {
@@ -82,6 +84,7 @@ function formatResolution(width, height) {
 }
 
 export default function DeviceManagementPage() {
+  const canMutate = canWrite()
   const [screens, setScreens] = useState([])
   const [groups, setGroups] = useState([])
   const [loading, setLoading] = useState(true)
@@ -261,25 +264,31 @@ export default function DeviceManagementPage() {
         width: 160,
         render: (_, record) => (
           <Space size="small">
-            <Button size="small" icon={<EditOutlined />} onClick={() => openEditGroup(record)}>
-              Edit
-            </Button>
-            <Popconfirm
-              title="Delete this screen group?"
-              description="Not allowed if any screen still belongs to the group, or schedules reference the group."
-              okText="Delete"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => handleDeleteGroup(record.id)}
-            >
-              <Button size="small" danger icon={<DeleteOutlined />}>
-                Delete
-              </Button>
-            </Popconfirm>
+            {canMutate ? (
+              <>
+                <Button size="small" icon={<EditOutlined />} onClick={() => openEditGroup(record)}>
+                  Edit
+                </Button>
+                <Popconfirm
+                  title="Delete this screen group?"
+                  description="Not allowed if any screen still belongs to the group, or schedules reference the group."
+                  okText="Delete"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleDeleteGroup(record.id)}
+                >
+                  <Button size="small" danger icon={<DeleteOutlined />}>
+                    Delete
+                  </Button>
+                </Popconfirm>
+              </>
+            ) : (
+              <Typography.Text type="secondary">—</Typography.Text>
+            )}
           </Space>
         ),
       },
     ],
-    [handleDeleteGroup, openEditGroup],
+    [canMutate, handleDeleteGroup, openEditGroup],
   )
 
   const handleCreate = async () => {
@@ -462,33 +471,37 @@ export default function DeviceManagementPage() {
             >
               View
             </Button>
-            <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-              Edit
-            </Button>
-            <Button
-              size="small"
-              type="primary"
-              icon={<KeyOutlined />}
-              onClick={() => handleActivationCode(record)}
-            >
-              Code
-            </Button>
-            <Popconfirm
-              title="Delete this screen?"
-              description="Not allowed if schedules still reference this screen."
-              okText="Delete"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => handleDelete(record.id)}
-            >
-              <Button size="small" danger icon={<DeleteOutlined />}>
-                Delete
-              </Button>
-            </Popconfirm>
+            {canMutate ? (
+              <>
+                <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+                  Edit
+                </Button>
+                <Button
+                  size="small"
+                  type="primary"
+                  icon={<KeyOutlined />}
+                  onClick={() => handleActivationCode(record)}
+                >
+                  Code
+                </Button>
+                <Popconfirm
+                  title="Delete this screen?"
+                  description="Not allowed if schedules still reference this screen."
+                  okText="Delete"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleDelete(record.id)}
+                >
+                  <Button size="small" danger icon={<DeleteOutlined />}>
+                    Delete
+                  </Button>
+                </Popconfirm>
+              </>
+            ) : null}
           </Space>
         ),
       },
     ],
-    [handleActivationCode, handleDelete, openEdit],
+    [canMutate, handleActivationCode, handleDelete, openEdit],
   )
 
   return (
@@ -514,6 +527,20 @@ export default function DeviceManagementPage() {
 
         {loadError ? (
           <Alert type="error" showIcon message="Failed to load screens" description={loadError} style={{ marginBottom: 16 }} />
+        ) : null}
+
+        {!loadError && !loading && filtered.length === 0 ? (
+          <Alert
+            type="info"
+            showIcon
+            message="No screens yet"
+            description={
+              isViewerRole(getStoredRole())
+                ? 'Your organization has no registered screens. Viewers cannot add devices; ask an administrator or editor to create them.'
+                : 'Create a screen with “Add screen” above.'
+            }
+            style={{ marginBottom: 16 }}
+          />
         ) : null}
 
         <Card
@@ -561,9 +588,11 @@ export default function DeviceManagementPage() {
             </Col>
 
             <Col xs={24} lg={6} style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button type="primary" icon={<PlusOutlined />} block onClick={openCreate}>
-                Add screen
-              </Button>
+              {canMutate ? (
+                <Button type="primary" icon={<PlusOutlined />} block onClick={openCreate}>
+                  Add screen
+                </Button>
+              ) : null}
             </Col>
           </Row>
 
@@ -602,9 +631,11 @@ export default function DeviceManagementPage() {
               </Space>
             </Col>
             <Col xs={24} md={10} lg={8} style={{ textAlign: 'right' }}>
-              <Button type="primary" icon={<PlusOutlined />} onClick={openCreateGroup}>
-                Add screen group
-              </Button>
+              {canMutate ? (
+                <Button type="primary" icon={<PlusOutlined />} onClick={openCreateGroup}>
+                  Add screen group
+                </Button>
+              ) : null}
             </Col>
           </Row>
           <Table

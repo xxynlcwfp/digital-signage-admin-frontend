@@ -26,6 +26,8 @@ import {
   requestUploadPolicy,
   uploadFileToPresignedUrl,
 } from '../../services/mediaService'
+import { canWrite, getStoredRole } from '../../services/authService'
+import { isViewerRole } from '../../utils/permissions'
 
 function bytesToHuman(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '-'
@@ -197,6 +199,7 @@ export function mapApiMediaItem(m) {
 }
 
 export default function MediaLibraryPanel({ onMediaChange }) {
+  const canMutate = canWrite()
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState(null)
@@ -343,6 +346,20 @@ export default function MediaLibraryPanel({ onMediaChange }) {
         />
       ) : null}
 
+      {!loadError && !loading && items.length === 0 ? (
+        <Alert
+          type="info"
+          showIcon
+          message="No media yet"
+          description={
+            isViewerRole(getStoredRole())
+              ? 'Your organization has no uploaded media. Viewers cannot upload files; ask an administrator or editor to add media.'
+              : 'Upload images or videos with “Upload media” above.'
+          }
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
+
       <Card
         variant="borderless"
         style={{
@@ -373,22 +390,24 @@ export default function MediaLibraryPanel({ onMediaChange }) {
             />
           </Space>
 
-          <Space direction="vertical" size={8} style={{ minWidth: 200, maxWidth: 360 }}>
-            <Upload
-              accept="image/*,video/*"
-              multiple
-              showUploadList={false}
-              beforeUpload={beforeUpload}
-              disabled={uploading}
-            >
-              <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
-                Upload media
-              </Button>
-            </Upload>
-            {uploading && uploadProgress != null ? (
-              <Progress percent={uploadProgress} size="small" status="active" />
-            ) : null}
-          </Space>
+          {canMutate ? (
+            <Space direction="vertical" size={8} style={{ minWidth: 200, maxWidth: 360 }}>
+              <Upload
+                accept="image/*,video/*"
+                multiple
+                showUploadList={false}
+                beforeUpload={beforeUpload}
+                disabled={uploading}
+              >
+                <Button type="primary" icon={<UploadOutlined />} loading={uploading}>
+                  Upload media
+                </Button>
+              </Upload>
+              {uploading && uploadProgress != null ? (
+                <Progress percent={uploadProgress} size="small" status="active" />
+              ) : null}
+            </Space>
+          ) : null}
         </Space>
       </Card>
 
@@ -439,9 +458,11 @@ export default function MediaLibraryPanel({ onMediaChange }) {
                     >
                       Preview
                     </Button>
-                    <Button danger icon={<DeleteOutlined />} onClick={() => removeItem(it)}>
-                      Delete
-                    </Button>
+                    {canMutate ? (
+                      <Button danger icon={<DeleteOutlined />} onClick={() => removeItem(it)}>
+                        Delete
+                      </Button>
+                    ) : null}
                   </Space>
                 </Space>
               </Card>
@@ -450,9 +471,9 @@ export default function MediaLibraryPanel({ onMediaChange }) {
         </Row>
       </Spin>
 
-      {!loading && filtered.length === 0 ? (
+      {!loading && filtered.length === 0 && items.length > 0 ? (
         <div style={{ padding: 48, textAlign: 'center' }}>
-          <Typography.Text type="secondary">No media</Typography.Text>
+          <Typography.Text type="secondary">No matching media</Typography.Text>
         </div>
       ) : null}
 

@@ -11,6 +11,8 @@ import {
 } from '@ant-design/icons'
 
 import { loadDashboardData } from '../../services/dashboardService'
+import { getStoredRole } from '../../services/authService'
+import { isViewerRole } from '../../utils/permissions'
 
 function SummaryCard({ title, value, icon, accent }) {
   return (
@@ -95,6 +97,13 @@ export default function DashboardPage() {
 
   const summary = data?.summary
   const deviceStatus = data?.deviceStatus
+  const isViewer = isViewerRole(getStoredRole())
+  const isEmptyOrg =
+    !usingMock &&
+    summary &&
+    Number(summary.totalDevices) === 0 &&
+    Number(summary.totalMedia) === 0 &&
+    Number(summary.activeSchedules) === 0
 
   const alertColumns = useMemo(
     () => [
@@ -186,6 +195,20 @@ export default function DashboardPage() {
             showIcon
             message="Partial data"
             description="Some dashboard sources failed (media/schedules counts, screen list, or per-screen event/playback logs). Summary cards use analytics where possible; alerts and activities may show aggregate fallbacks."
+            style={{ marginBottom: 16 }}
+          />
+        ) : null}
+
+        {isEmptyOrg ? (
+          <Alert
+            type="info"
+            showIcon
+            message="No content in your organization yet"
+            description={
+              isViewer
+                ? 'This organization has no devices, media, or schedules yet. As a viewer you can browse data once an administrator or editor adds it. Contact your admin if you expected to see content here.'
+                : 'Add devices, media, and schedules from the sidebar to populate the dashboard.'
+            }
             style={{ marginBottom: 16 }}
           />
         ) : null}

@@ -9,14 +9,15 @@ import {
   MonitorOutlined,
   PictureOutlined,
   LogoutOutlined,
+  TeamOutlined,
 } from '@ant-design/icons'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
-import { getStoredUsername } from '../services/authService'
+import { canManageUsers, getStoredUsername } from '../services/authService'
 
 const { Header, Sider, Content } = Layout
 
-const MENU_ITEMS = [
+const BASE_MENU_ITEMS = [
   {
     key: '/dashboard',
     icon: <AppstoreOutlined />,
@@ -44,6 +45,12 @@ const MENU_ITEMS = [
   },
 ]
 
+const ADMIN_MENU_ITEM = {
+  key: '/users',
+  icon: <TeamOutlined />,
+  label: <Link to="/users">User Management</Link>,
+}
+
 export default function AdminLayout() {
   const location = useLocation()
   const { isAuthenticated, logout } = useAuth()
@@ -51,14 +58,19 @@ export default function AdminLayout() {
 
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
+  const menuItems = useMemo(
+    () => (canManageUsers() ? [...BASE_MENU_ITEMS, ADMIN_MENU_ITEM] : BASE_MENU_ITEMS),
+    [],
+  )
+
   const selectedKeys = useMemo(() => {
-    const match = MENU_ITEMS.find((item) =>
+    const match = menuItems.find((item) =>
       location.pathname === '/'
         ? false
         : location.pathname === item.key || location.pathname.startsWith(item.key + '/'),
     )
     return [match?.key || '/dashboard']
-  }, [location.pathname])
+  }, [location.pathname, menuItems])
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -110,7 +122,7 @@ export default function AdminLayout() {
           mode="inline"
           theme="dark"
           selectedKeys={selectedKeys}
-          items={MENU_ITEMS}
+          items={menuItems}
           style={{ borderRight: 0, paddingTop: 8 }}
         />
       </Sider>

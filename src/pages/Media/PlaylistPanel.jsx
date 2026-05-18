@@ -38,6 +38,8 @@ import {
   playlistItemsToEditorRows,
   updatePlaylist,
 } from '../../services/playlistService'
+import { canWrite, getStoredRole } from '../../services/authService'
+import { isViewerRole } from '../../utils/permissions'
 
 const STATUS_META = {
   [PLAYLIST_STATUSES.ACTIVE]: { color: 'green', label: 'Active' },
@@ -68,6 +70,7 @@ function newEditorRow(mediaId, mediaList) {
  * @param {import('./MediaLibraryPanel').mapApiMediaItem extends Function ? never : unknown} props
  */
 export default function PlaylistPanel({ mediaItems: mediaItemsProp }) {
+  const canMutate = canWrite()
   const [playlists, setPlaylists] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
@@ -339,12 +342,16 @@ export default function PlaylistPanel({ mediaItems: mediaItemsProp }) {
           <Button size="small" icon={<EyeOutlined />} onClick={() => openView(record)}>
             View
           </Button>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
-            Edit
-          </Button>
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => onDelete(record)}>
-            Delete
-          </Button>
+          {canMutate ? (
+            <>
+              <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+                Edit
+              </Button>
+              <Button size="small" danger icon={<DeleteOutlined />} onClick={() => onDelete(record)}>
+                Delete
+              </Button>
+            </>
+          ) : null}
         </Space>
       ),
     },
@@ -442,6 +449,20 @@ export default function PlaylistPanel({ mediaItems: mediaItemsProp }) {
         <Alert type="error" showIcon message="Failed to load playlists" description={loadError} style={{ marginBottom: 16 }} />
       ) : null}
 
+      {!loadError && !usingMock && !loading && playlists.length === 0 ? (
+        <Alert
+          type="info"
+          showIcon
+          message="No playlists yet"
+          description={
+            isViewerRole(getStoredRole())
+              ? 'Your organization has no playlists. Viewers cannot create playlists; ask an administrator or editor to add them.'
+              : 'Create a playlist with “Create playlist” above after uploading media.'
+          }
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
+
       <Card
         variant="borderless"
         style={{
@@ -458,9 +479,11 @@ export default function PlaylistPanel({ mediaItems: mediaItemsProp }) {
             <Button icon={<ReloadOutlined />} onClick={loadPlaylists} loading={loading}>
               Refresh
             </Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-              Create playlist
-            </Button>
+            {canMutate ? (
+              <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+                Create playlist
+              </Button>
+            ) : null}
           </Space>
         </Space>
 
@@ -547,7 +570,7 @@ export default function PlaylistPanel({ mediaItems: mediaItemsProp }) {
           <Button key="close" onClick={() => setViewOpen(false)}>
             Close
           </Button>,
-          viewPlaylist?.id != null ? (
+          viewPlaylist?.id != null && canMutate ? (
             <Button
               key="edit"
               type="primary"

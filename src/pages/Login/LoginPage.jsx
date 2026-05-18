@@ -26,9 +26,11 @@ import {
 import {
   getApiErrorMessage,
   login,
+  markApplyViewerOnNextLogin,
   registerOrganization,
   verifyEmail,
 } from '../../services/authService'
+import { applyViewerRoleAfterRegistration } from '../../services/registrationAuth'
 
 const ORG_CODE_PATTERN = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/
 
@@ -39,7 +41,7 @@ export default function LoginPage() {
   const [registerForm] = Form.useForm()
   const [verifyForm] = Form.useForm()
   const [activeTab, setActiveTab] = useState('login')
-  /** After submit register: collect email + admin username for verify-email step */
+  /** After submit register: email + username for verify step and login prefill */
   const [verifyContext, setVerifyContext] = useState(null)
   /** 'form' = org registration fields; 'verify' = 6-digit email code */
   const [registerSubStep, setRegisterSubStep] = useState('form')
@@ -61,11 +63,12 @@ export default function LoginPage() {
       setLoginError('')
       setLoginLoading(true)
       try {
-        const data = await login({
+        let data = await login({
           username: values.username.trim(),
           password: values.password,
         })
         if (data?.accessToken) {
+          data = await applyViewerRoleAfterRegistration(data)
           setAuthenticated(true)
           navigate('/dashboard', { replace: true })
           return
@@ -92,9 +95,10 @@ export default function LoginPage() {
           adminPassword: values.adminPassword,
           adminEmail: values.adminEmail.trim(),
         })
-        const email = values.adminEmail.trim()
-        const username = values.adminUsername.trim()
-        setVerifyContext({ email, username })
+        setVerifyContext({
+          email: values.adminEmail.trim(),
+          username: values.adminUsername.trim(),
+        })
         setRegisterSubStep('verify')
         registerForm.resetFields()
         verifyForm.resetFields()
@@ -125,11 +129,12 @@ export default function LoginPage() {
           email: verifyContext.email,
           code: values.code,
         })
+        markApplyViewerOnNextLogin()
         message.success('Email verified. Your account is ready — you can sign in now.')
         verifyForm.resetFields()
-        setVerifyContext(null)
         setRegisterSubStep('form')
         loginForm.setFieldsValue({ username: verifyContext.username })
+        setVerifyContext(null)
         setActiveTab('login')
       } catch (e) {
         setVerifyError(getApiErrorMessage(e))
@@ -230,7 +235,7 @@ export default function LoginPage() {
                   ? 'Admin Login'
                   : registerSubStep === 'verify'
                     ? 'Verify email'
-                    : 'Create organization'}
+                    : 'Create Account'}
               </Typography.Text>
             </div>
 
@@ -338,7 +343,7 @@ export default function LoginPage() {
                   />
                 </Form.Item>
                 <Form.Item
-                  label="Admin username"
+                  label="Username"
                   name="adminUsername"
                   rules={[
                     { required: true, message: 'Enter admin username' },
@@ -348,15 +353,15 @@ export default function LoginPage() {
                   <Input
                     size="large"
                     prefix={<TeamOutlined style={{ color: '#94a3b8' }} />}
-                    placeholder="First admin username"
+                    placeholder="Username"
                     autoComplete="username"
                   />
                 </Form.Item>
                 <Form.Item
-                  label="Admin password"
+                  label="Password"
                   name="adminPassword"
                   rules={[
-                    { required: true, message: 'Enter admin password' },
+                    { required: true, message: 'Enter password' },
                     { min: 8, max: 128, message: 'Length 8–128 characters' },
                   ]}
                 >
@@ -368,10 +373,10 @@ export default function LoginPage() {
                   />
                 </Form.Item>
                 <Form.Item
-                  label="Admin email"
+                  label="Email"
                   name="adminEmail"
                   rules={[
-                    { required: true, message: 'Enter admin email' },
+                    { required: true, message: 'Enter email' },
                     { type: 'email', message: 'Enter a valid email' },
                     { max: 255, message: 'Max 255 characters' },
                   ]}
@@ -379,11 +384,10 @@ export default function LoginPage() {
                   <Input
                     size="large"
                     prefix={<MailOutlined style={{ color: '#94a3b8' }} />}
-                    placeholder="admin@example.com"
+                    placeholder="user@example.com"
                     autoComplete="email"
                   />
                 </Form.Item>
-
                 <Form.Item style={{ marginBottom: 12 }}>
                   <Button
                     type="primary"
@@ -392,7 +396,7 @@ export default function LoginPage() {
                     block
                     loading={registerLoading}
                   >
-                    Register organization
+                    Register Account
                   </Button>
                 </Form.Item>
               </Form>

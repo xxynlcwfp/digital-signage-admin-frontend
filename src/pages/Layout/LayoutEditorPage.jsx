@@ -26,6 +26,7 @@ import {
   listLayoutTemplates,
   updateLayout,
 } from '../../services/layoutService'
+import { canWrite } from '../../services/authService'
 
 const { Content, Sider } = Layout
 
@@ -96,6 +97,7 @@ function mapLoadedRegionToUi(r, idx) {
 }
 
 export default function LayoutEditorPage() {
+  const canMutate = canWrite()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const idParam = params.get('id')
@@ -423,14 +425,18 @@ export default function LayoutEditorPage() {
                 <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/layouts')}>
                   Back
                 </Button>
-                <Button icon={<SaveOutlined />} loading={saving} onClick={onSaveDraft}>
-                  Save draft
-                </Button>
-                <Button type="primary" icon={<SendOutlined />} loading={saving} onClick={onPublish}>
-                  Publish
-                </Button>
-                {isNew ? (
-                  <Button onClick={applyTemplateAgain}>Reload template</Button>
+                {canMutate ? (
+                  <>
+                    <Button icon={<SaveOutlined />} loading={saving} onClick={onSaveDraft}>
+                      Save draft
+                    </Button>
+                    <Button type="primary" icon={<SendOutlined />} loading={saving} onClick={onPublish}>
+                      Publish
+                    </Button>
+                    {isNew ? (
+                      <Button onClick={applyTemplateAgain}>Reload template</Button>
+                    ) : null}
+                  </>
                 ) : null}
               </Space>
 
@@ -522,9 +528,11 @@ export default function LayoutEditorPage() {
                       <Tag color="geekblue" style={{ margin: 0 }}>
                         {c.name}
                       </Tag>
-                      <Button size="small" icon={<PlusOutlined />} onClick={() => addRegion(c.type)}>
-                        Add
-                      </Button>
+                      {canMutate ? (
+                        <Button size="small" icon={<PlusOutlined />} onClick={() => addRegion(c.type)}>
+                          Add
+                        </Button>
+                      ) : null}
                     </div>
                   ))}
                 </Space>
@@ -630,9 +638,11 @@ export default function LayoutEditorPage() {
               <Card
                 title="Region properties"
                 extra={
-                  <Button danger size="small" disabled={!selectedRegion} onClick={removeSelected}>
-                    Delete
-                  </Button>
+                  canMutate ? (
+                    <Button danger size="small" disabled={!selectedRegion} onClick={removeSelected}>
+                      Delete
+                    </Button>
+                  ) : null
                 }
                 variant="borderless"
                 style={{
