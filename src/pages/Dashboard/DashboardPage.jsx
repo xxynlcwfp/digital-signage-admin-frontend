@@ -173,9 +173,11 @@ export default function DashboardPage() {
               {usingMock ? 'Demo data (live API unavailable).' : 'Live metrics from server.'}
             </Typography.Text>
           </div>
-          <Tag icon={<ClockCircleOutlined />} color="default">
-            Updated at {data?.updatedAt || '--'}
-          </Tag>
+          <Space size={12} wrap>
+            <Tag icon={<ClockCircleOutlined />} color="default">
+              Updated at {data?.updatedAt || '--'}
+            </Tag>
+          </Space>
         </Space>
 
         {usingMock && loadErrorMessage ? (
@@ -399,6 +401,7 @@ export default function DashboardPage() {
           </Col>
         </Row>
       </div>
+
     </div>
   )
 }

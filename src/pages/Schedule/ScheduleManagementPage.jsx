@@ -3,12 +3,14 @@ import {
   Alert,
   Button,
   Card,
+  Col,
   DatePicker,
   Descriptions,
   Form,
   Input,
   InputNumber,
   Modal,
+  Row,
   Select,
   Space,
   Spin,
@@ -41,6 +43,7 @@ import {
 } from '../../services/scheduleService'
 import { canWrite, getStoredRole } from '../../services/authService'
 import { isViewerRole } from '../../utils/permissions'
+import ScheduleFormPreview from '../../components/ScheduleFormPreview'
 
 const STATUS_META = {
   [SCHEDULE_STATUSES.ACTIVE]: { color: 'green', label: 'Active' },
@@ -129,6 +132,15 @@ export default function ScheduleManagementPage() {
   const [detailError, setDetailError] = useState('')
 
   const targetTypeWatch = Form.useWatch('targetType', form)
+  const layoutIdWatch = Form.useWatch('layoutId', form)
+  const playlistIdWatch = Form.useWatch('playlistId', form)
+  const nameWatch = Form.useWatch('name', form)
+  const statusWatch = Form.useWatch('status', form)
+  const priorityWatch = Form.useWatch('priority', form)
+  const startWatch = Form.useWatch('startDatetime', form)
+  const endWatch = Form.useWatch('endDatetime', form)
+  const screenIdWatch = Form.useWatch('screenId', form)
+  const screenGroupIdWatch = Form.useWatch('screenGroupId', form)
 
   const layoutMap = useMemo(
     () => new Map(options.layouts.map((l) => [l.id, l.name])),
@@ -152,6 +164,19 @@ export default function ScheduleManagementPage() {
     () => new Map(options.screenGroups.map((g) => [g.id, g.name || `Group #${g.id}`])),
     [options.screenGroups],
   )
+
+  const previewTargetSummary = useMemo(() => {
+    const t = targetTypeWatch || SCHEDULE_TARGET_TYPES.SCREEN
+    if (t === SCHEDULE_TARGET_TYPES.DEFAULT) return 'Organization default'
+    if (t === SCHEDULE_TARGET_TYPES.GROUP) {
+      return screenGroupIdWatch != null
+        ? groupMap.get(screenGroupIdWatch) || `Group #${screenGroupIdWatch}`
+        : 'Screen group (not selected)'
+    }
+    return screenIdWatch != null
+      ? screenMap.get(screenIdWatch) || `Screen #${screenIdWatch}`
+      : 'Screen (not selected)'
+  }, [targetTypeWatch, screenIdWatch, screenGroupIdWatch, screenMap, groupMap])
 
   const loadPlaylists = useCallback(async () => {
     setPlaylistsLoading(true)
@@ -508,12 +533,14 @@ export default function ScheduleManagementPage() {
         cancelText="Cancel"
         confirmLoading={submitLoading}
         destroyOnClose
-        width={720}
+        width={1060}
       >
         {formError ? (
           <Alert type="error" showIcon message={formError} style={{ marginBottom: 16 }} />
         ) : null}
 
+        <Row gutter={20} align="top">
+          <Col xs={24} lg={14}>
         <Form
           form={form}
           layout="vertical"
@@ -685,6 +712,22 @@ export default function ScheduleManagementPage() {
             </Form.Item>
           </Space>
         </Form>
+          </Col>
+          <Col xs={24} lg={10}>
+            <ScheduleFormPreview
+              scheduleName={nameWatch}
+              layoutId={layoutIdWatch}
+              playlistId={playlistIdWatch}
+              layoutLabel={layoutIdWatch != null ? layoutMap.get(layoutIdWatch) : undefined}
+              playlistLabel={playlistIdWatch != null ? playlistMap.get(playlistIdWatch) : undefined}
+              targetSummary={previewTargetSummary}
+              status={statusWatch}
+              priority={priorityWatch}
+              startDatetime={startWatch}
+              endDatetime={endWatch}
+            />
+          </Col>
+        </Row>
       </Modal>
 
       <Modal

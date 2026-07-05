@@ -13,7 +13,8 @@ import {
 } from '@ant-design/icons'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
-import { canManageUsers, getStoredUsername } from '../services/authService'
+import { canManageUsers } from '../utils/permissions'
+import { getStoredRole, getStoredUsername } from '../services/authService'
 
 const { Header, Sider, Content } = Layout
 
@@ -55,10 +56,11 @@ export default function AdminLayout() {
   const location = useLocation()
   const { isAuthenticated, logout } = useAuth()
   const [collapsed, setCollapsed] = useState(false)
+  const role = getStoredRole()
 
   const menuItems = useMemo(
-    () => (canManageUsers() ? [...BASE_MENU_ITEMS, ADMIN_MENU_ITEM] : BASE_MENU_ITEMS),
-    [],
+    () => (canManageUsers(role) ? [...BASE_MENU_ITEMS, ADMIN_MENU_ITEM] : BASE_MENU_ITEMS),
+    [role],
   )
 
   const selectedKeys = useMemo(() => {

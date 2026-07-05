@@ -4,6 +4,7 @@ import WriteAccessRoute from './components/WriteAccessRoute'
 import AdminLayout from './layouts/AdminLayout'
 import DashboardPage from './pages/Dashboard/DashboardPage'
 import DeviceManagementPage from './pages/Device/DeviceManagementPage'
+import ScreenDetailPage from './pages/Device/ScreenDetailPage'
 import LayoutEditorPage from './pages/Layout/LayoutEditorPage'
 import LayoutManagementPage from './pages/Layout/LayoutManagementPage'
 import MediaManagementPage from './pages/Media/MediaManagementPage'
@@ -29,6 +30,7 @@ export default function App() {
             }
           />
           <Route path="/devices" element={<DeviceManagementPage />} />
+          <Route path="/devices/:screenId" element={<ScreenDetailPage />} />
           <Route path="/media" element={<MediaManagementPage />} />
           <Route path="/schedules" element={<ScheduleManagementPage />} />
           <Route

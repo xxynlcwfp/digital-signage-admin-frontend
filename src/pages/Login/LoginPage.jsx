@@ -8,6 +8,7 @@ import {
   ConfigProvider,
   Form,
   Input,
+  Segmented,
   Space,
   Tabs,
   Typography,
@@ -26,11 +27,11 @@ import {
 import {
   getApiErrorMessage,
   login,
-  markApplyViewerOnNextLogin,
+  fetchCurrentUser,
+  registerJoinOrganization,
   registerOrganization,
   verifyEmail,
 } from '../../services/authService'
-import { applyViewerRoleAfterRegistration } from '../../services/registrationAuth'
 
 const ORG_CODE_PATTERN = /^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$/
 
@@ -41,6 +42,8 @@ export default function LoginPage() {
   const [registerForm] = Form.useForm()
   const [verifyForm] = Form.useForm()
   const [activeTab, setActiveTab] = useState('login')
+  /** 'join' = Viewer under existing team code; 'create' = new organization */
+  const [registerMode, setRegisterMode] = useState('join')
   /** After submit register: email + username for verify step and login prefill */
   const [verifyContext, setVerifyContext] = useState(null)
   /** 'form' = org registration fields; 'verify' = 6-digit email code */
@@ -63,12 +66,16 @@ export default function LoginPage() {
       setLoginError('')
       setLoginLoading(true)
       try {
-        let data = await login({
+        const data = await login({
           username: values.username.trim(),
           password: values.password,
         })
         if (data?.accessToken) {
-          data = await applyViewerRoleAfterRegistration(data)
+          try {
+            await fetchCurrentUser()
+          } catch {
+            /* keep login response if /me fails */
+          }
           setAuthenticated(true)
           navigate('/dashboard', { replace: true })
           return
@@ -88,16 +95,33 @@ export default function LoginPage() {
       setRegisterError('')
       setRegisterLoading(true)
       try {
-        const data = await registerOrganization({
-          organizationName: values.organizationName.trim(),
-          organizationCode: values.organizationCode.trim().toLowerCase(),
-          adminUsername: values.adminUsername.trim(),
-          adminPassword: values.adminPassword,
-          adminEmail: values.adminEmail.trim(),
-        })
+        const username = values.username.trim()
+        const email = values.email.trim()
+        const teamCode = values.organizationCode?.trim().toLowerCase()
+
+        let data
+        if (registerMode === 'join') {
+          data = await registerJoinOrganization({
+            organizationCode: teamCode,
+            username,
+            password: values.password,
+            email,
+          })
+        } else {
+          data = await registerOrganization({
+            registrationType: 'CREATE_ORGANIZATION',
+            organizationName: values.organizationName.trim(),
+            organizationCode: teamCode,
+            username,
+            password: values.password,
+            email,
+          })
+        }
+
         setVerifyContext({
-          email: values.adminEmail.trim(),
-          username: values.adminUsername.trim(),
+          email,
+          username,
+          registerMode,
         })
         setRegisterSubStep('verify')
         registerForm.resetFields()
@@ -113,7 +137,7 @@ export default function LoginPage() {
         setRegisterLoading(false)
       }
     },
-    [registerForm, verifyForm],
+    [registerForm, verifyForm, registerMode],
   )
 
   const onVerifyFinish = useCallback(
@@ -125,15 +149,19 @@ export default function LoginPage() {
       setVerifyError('')
       setVerifyLoading(true)
       try {
-        await verifyEmail({
+        const verified = await verifyEmail({
           email: verifyContext.email,
           code: values.code,
         })
-        markApplyViewerOnNextLogin()
-        message.success('Email verified. Your account is ready — you can sign in now.')
+        const signInUsername = verified?.username ?? verifyContext.username
+        message.success(
+          verified?.username && verified.username !== verifyContext.username
+            ? `Email verified. Sign in as ${signInUsername} (Viewer).`
+            : 'Email verified. Sign in — your account is a Viewer.',
+        )
         verifyForm.resetFields()
         setRegisterSubStep('form')
-        loginForm.setFieldsValue({ username: verifyContext.username })
+        loginForm.setFieldsValue({ username: signInUsername })
         setVerifyContext(null)
         setActiveTab('login')
       } catch (e) {
@@ -158,6 +186,7 @@ export default function LoginPage() {
       verifyForm.resetFields()
       setVerifyContext(null)
       setRegisterSubStep('form')
+      setRegisterMode('join')
     }
   }
 
@@ -181,12 +210,12 @@ export default function LoginPage() {
     >
       <div
         style={{
-          position: 'fixed',
-          inset: 0,
+          minHeight: '100dvh',
+          overflowY: 'auto',
           display: 'flex',
-          alignItems: 'center',
           justifyContent: 'center',
-          padding: 24,
+          alignItems: 'flex-start',
+          padding: '16px 20px 24px',
           boxSizing: 'border-box',
           background:
             'linear-gradient(160deg, #eef2f7 0%, #e4eaf3 42%, #dce4f0 100%)',
@@ -197,23 +226,29 @@ export default function LoginPage() {
           style={{
             width: '100%',
             maxWidth: activeTab === 'register' ? 440 : 400,
+            margin: 'auto 0',
+            flexShrink: 0,
             boxShadow:
               '0 1px 2px rgba(15, 23, 42, 0.06), 0 12px 40px rgba(15, 23, 42, 0.08)',
             borderRadius: 12,
           }}
-          styles={{ body: { padding: '40px 36px 36px' } }}
+          styles={{
+            body: {
+              padding: activeTab === 'register' ? '28px 28px 24px' : '36px 32px 28px',
+            },
+          }}
         >
           <Space
             direction="vertical"
-            size="large"
+            size={activeTab === 'register' ? 'middle' : 'large'}
             style={{ width: '100%', textAlign: 'center' }}
           >
             <div>
               <div
                 style={{
-                  width: 52,
-                  height: 52,
-                  margin: '0 auto 16px',
+                  width: activeTab === 'register' ? 44 : 52,
+                  height: activeTab === 'register' ? 44 : 52,
+                  margin: '0 auto 12px',
                   borderRadius: 12,
                   background: 'linear-gradient(135deg, #1a5fb4 0%, #0d47a1 100%)',
                   display: 'flex',
@@ -227,15 +262,20 @@ export default function LoginPage() {
               >
                 <DesktopOutlined />
               </div>
-              <Typography.Title level={3} style={{ margin: 0, color: '#0f172a' }}>
+              <Typography.Title
+                level={activeTab === 'register' ? 4 : 3}
+                style={{ margin: 0, color: '#0f172a' }}
+              >
                 Digital Signage Platform
               </Typography.Title>
               <Typography.Text type="secondary" style={{ fontSize: 14 }}>
                 {activeTab === 'login'
-                  ? 'Admin Login'
+                  ? 'Account Login'
                   : registerSubStep === 'verify'
                     ? 'Verify email'
-                    : 'Create Account'}
+                    : registerMode === 'join'
+                      ? 'Join organization (Viewer)'
+                      : 'Create organization'}
               </Typography.Text>
             </div>
 
@@ -301,30 +341,62 @@ export default function LoginPage() {
                 form={registerForm}
                 layout="vertical"
                 requiredMark={false}
+                size="middle"
                 onFinish={onRegisterFinish}
                 onValuesChange={() => registerError && setRegisterError('')}
                 style={{ textAlign: 'left' }}
               >
-                <Form.Item
-                  label="Organization name"
-                  name="organizationName"
-                  rules={[
-                    { required: true, message: 'Enter organization name' },
-                    { max: 255, message: 'Max 255 characters' },
+                <Segmented
+                  block
+                  value={registerMode}
+                  onChange={setRegisterMode}
+                  options={[
+                    { label: 'Join (Viewer)', value: 'join' },
+                    { label: 'New organization', value: 'create' },
                   ]}
-                >
+                  style={{ marginBottom: 12 }}
+                />
+
+                {registerMode === 'join' ? (
+                  <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 12 }}
+                    message="Viewer registration"
+                    description="Enter your team's existing organization code. After email verification you join as a Viewer."
+                  />
+                ) : null}
+
+                {activeTab === 'register' && registerSubStep === 'form' && registerError ? (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message={registerError}
+                    style={{ marginBottom: 12, textAlign: 'left' }}
+                  />
+                ) : null}
+
+                {registerMode === 'create' ? (
+                  <Form.Item
+                    label="Organization name"
+                    name="organizationName"
+                    rules={[
+                      { required: true, message: 'Enter organization name' },
+                      { max: 255, message: 'Max 255 characters' },
+                    ]}
+                  >
                   <Input
-                    size="large"
                     prefix={<BankOutlined style={{ color: '#94a3b8' }} />}
                     placeholder="Organization name"
                     autoComplete="organization"
                   />
                 </Form.Item>
+                ) : null}
+
                 <Form.Item
-                  label="Organization code"
+                  label={registerMode === 'join' ? 'Team organization code' : 'Organization code'}
                   name="organizationCode"
                   normalize={(v) => (typeof v === 'string' ? v.toLowerCase() : v)}
-                  extra="Lowercase letters, digits, optional hyphens (2–64 chars)."
                   rules={[
                     { required: true, message: 'Enter organization code' },
                     { min: 2, max: 64, message: 'Length 2–64 characters' },
@@ -336,7 +408,6 @@ export default function LoginPage() {
                   ]}
                 >
                   <Input
-                    size="large"
                     prefix={<IdcardOutlined style={{ color: '#94a3b8' }} />}
                     placeholder="e.g. acme-corp"
                     autoComplete="off"
@@ -344,14 +415,13 @@ export default function LoginPage() {
                 </Form.Item>
                 <Form.Item
                   label="Username"
-                  name="adminUsername"
+                  name="username"
                   rules={[
-                    { required: true, message: 'Enter admin username' },
+                    { required: true, message: 'Enter username' },
                     { min: 2, max: 64, message: 'Length 2–64 characters' },
                   ]}
                 >
                   <Input
-                    size="large"
                     prefix={<TeamOutlined style={{ color: '#94a3b8' }} />}
                     placeholder="Username"
                     autoComplete="username"
@@ -359,14 +429,13 @@ export default function LoginPage() {
                 </Form.Item>
                 <Form.Item
                   label="Password"
-                  name="adminPassword"
+                  name="password"
                   rules={[
                     { required: true, message: 'Enter password' },
                     { min: 8, max: 128, message: 'Length 8–128 characters' },
                   ]}
                 >
                   <Input.Password
-                    size="large"
                     prefix={<LockOutlined style={{ color: '#94a3b8' }} />}
                     placeholder="Password"
                     autoComplete="new-password"
@@ -374,7 +443,7 @@ export default function LoginPage() {
                 </Form.Item>
                 <Form.Item
                   label="Email"
-                  name="adminEmail"
+                  name="email"
                   rules={[
                     { required: true, message: 'Enter email' },
                     { type: 'email', message: 'Enter a valid email' },
@@ -382,13 +451,12 @@ export default function LoginPage() {
                   ]}
                 >
                   <Input
-                    size="large"
                     prefix={<MailOutlined style={{ color: '#94a3b8' }} />}
                     placeholder="user@example.com"
                     autoComplete="email"
                   />
                 </Form.Item>
-                <Form.Item style={{ marginBottom: 12 }}>
+                <Form.Item style={{ marginBottom: 0, marginTop: 4 }}>
                   <Button
                     type="primary"
                     htmlType="submit"
@@ -396,7 +464,7 @@ export default function LoginPage() {
                     block
                     loading={registerLoading}
                   >
-                    Register Account
+                    {registerMode === 'join' ? 'Register as Viewer' : 'Register organization'}
                   </Button>
                 </Form.Item>
               </Form>
@@ -408,8 +476,11 @@ export default function LoginPage() {
                   message="Almost done"
                   description={
                     <span>
-                      Save your organization only after email verification. A 6-digit code was sent
-                      to <strong>{verifyContext?.email}</strong>.
+                      Complete registration with the 6-digit code sent to{' '}
+                      <strong>{verifyContext?.email}</strong>
+                      {verifyContext?.registerMode === 'join'
+                        ? ' (check backend logs if SMTP is off).'
+                        : '.'}
                     </span>
                   }
                 />
@@ -449,7 +520,7 @@ export default function LoginPage() {
                         block
                         loading={verifyLoading}
                       >
-                        Verify email and create account
+                        Verify email and finish registration
                       </Button>
                       <Button type="link" onClick={backToRegisterForm} block style={{ marginInline: 0 }}>
                         Back to registration form
@@ -461,7 +532,10 @@ export default function LoginPage() {
             )}
 
             <div
-              style={{ minHeight: 48, marginTop: -8 }}
+              style={{
+                minHeight: activeTab === 'login' || registerSubStep === 'verify' ? 48 : 0,
+                marginTop: activeTab === 'login' || registerSubStep === 'verify' ? -8 : 0,
+              }}
               aria-live="polite"
               aria-relevant="additions text"
             >
@@ -470,14 +544,6 @@ export default function LoginPage() {
                   type="error"
                   showIcon
                   message={loginError}
-                  style={{ textAlign: 'left' }}
-                />
-              ) : null}
-              {activeTab === 'register' && registerSubStep === 'form' && registerError ? (
-                <Alert
-                  type="error"
-                  showIcon
-                  message={registerError}
                   style={{ textAlign: 'left' }}
                 />
               ) : null}

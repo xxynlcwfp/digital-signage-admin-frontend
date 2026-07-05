@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { API_BASE_URL } from '../config/apiConfig'
 import { canManageUsers as canManageUsersForRole, canWrite as canWriteForRole, normalizeRole } from '../utils/permissions'
 
 const STORAGE_ACCESS_TOKEN = 'ds_admin_token'
@@ -9,20 +10,11 @@ const STORAGE_USER = 'ds_admin_user'
 const AUTH_LOGIN_PATH = '/api/admin/auth/login'
 const AUTH_REFRESH_PATH = '/api/admin/auth/refresh'
 const USERS_ME_PATH = '/api/admin/users/me'
-/** Set after org registration verify; first login demotes self to VIEWER (backend creates ADMIN). */
-const APPLY_VIEWER_ON_LOGIN_KEY = 'ds_apply_viewer_on_login'
-
-/**
- * Base URL for API calls. In dev, Vite proxies `/api` to the backend (see vite.config.js).
- */
-const baseURL =
-  import.meta.env.VITE_API_BASE_URL != null &&
-  String(import.meta.env.VITE_API_BASE_URL).trim() !== ''
-    ? String(import.meta.env.VITE_API_BASE_URL).trim().replace(/\/+$/, '')
-    : ''
+const AUTH_REGISTER_PATH = '/api/admin/auth/register'
+const AUTH_VERIFY_EMAIL_PATH = '/api/admin/auth/verify-email'
 
 export const authApi = axios.create({
-  baseURL,
+  baseURL: API_BASE_URL,
   timeout: 30000,
   headers: { 'Content-Type': 'application/json' },
 })
@@ -387,42 +379,58 @@ export async function login(payload) {
   }
 }
 
-export function markApplyViewerOnNextLogin() {
-  sessionStorage.setItem(APPLY_VIEWER_ON_LOGIN_KEY, '1')
-}
-
-export function shouldApplyViewerOnLogin() {
-  return sessionStorage.getItem(APPLY_VIEWER_ON_LOGIN_KEY) === '1'
-}
-
-export function clearApplyViewerOnLogin() {
-  sessionStorage.removeItem(APPLY_VIEWER_ON_LOGIN_KEY)
-}
-
 /**
- * RegisterOrganizationRequest — no role field; role is assigned by the backend after verify-email.
- * @param {{ organizationName: string, organizationCode: string, adminUsername: string, adminPassword: string, adminEmail: string }} payload
+ * POST /api/admin/auth/register — RegisterOrganizationRequest
+ * @param {{
+ *   registrationType: 'CREATE_ORGANIZATION' | 'JOIN_ORGANIZATION'
+ *   organizationName?: string
+ *   organizationCode: string
+ *   username: string
+ *   password: string
+ *   email: string
+ * }} payload
  */
 export async function registerOrganization(payload) {
   try {
     const body = {
-      organizationName: payload.organizationName,
-      organizationCode: payload.organizationCode,
-      adminUsername: payload.adminUsername,
-      adminPassword: payload.adminPassword,
-      adminEmail: payload.adminEmail,
+      registrationType: payload.registrationType,
+      organizationCode: String(payload.organizationCode).trim().toLowerCase(),
+      username: String(payload.username).trim(),
+      password: payload.password,
+      email: String(payload.email).trim(),
     }
-    const res = await authApi.post('/api/admin/auth/register', body, { skipAuthRefresh: true })
+    if (payload.registrationType === 'CREATE_ORGANIZATION') {
+      body.organizationName = String(payload.organizationName).trim()
+    }
+    const res = await authApi.post(AUTH_REGISTER_PATH, body, { skipAuthRefresh: true })
     return unwrapApiResponse(res)
   } catch (e) {
     throw new Error(getApiErrorMessage(e), { cause: e })
   }
 }
 
+/**
+ * Join an existing organization as Viewer (registrationType JOIN_ORGANIZATION).
+ * @param {{ organizationCode: string, username: string, password: string, email: string }} payload
+ */
+export async function registerJoinOrganization(payload) {
+  return registerOrganization({
+    registrationType: 'JOIN_ORGANIZATION',
+    organizationCode: payload.organizationCode,
+    username: payload.username,
+    password: payload.password,
+    email: payload.email,
+  })
+}
+
+/**
+ * POST /api/admin/auth/verify-email — VerifyEmailRequest
+ * @param {{ email: string, code: string }} payload
+ */
 export async function verifyEmail(payload) {
   try {
     const res = await authApi.post(
-      '/api/admin/auth/verify-email',
+      AUTH_VERIFY_EMAIL_PATH,
       {
         email: payload.email.trim(),
         code: String(payload.code).trim(),
