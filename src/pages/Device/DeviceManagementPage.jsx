@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Button,
   Card,
   Col,
-  Descriptions,
   Divider,
   Form,
   Input,
@@ -13,7 +13,6 @@ import {
   Row,
   Select,
   Space,
-  Spin,
   Table,
   Tag,
   Typography,
@@ -22,24 +21,20 @@ import {
 import {
   DeleteOutlined,
   EditOutlined,
-  EyeOutlined,
   KeyOutlined,
   PlusOutlined,
   ReloadOutlined,
   TeamOutlined,
 } from '@ant-design/icons'
 import {
-  assignScreenGroup,
   createScreen,
   createScreenGroup,
   deleteScreen,
   deleteScreenGroup,
   generateActivationCode,
   getApiErrorMessage,
-  getScreen,
   listScreenGroups,
   listScreens,
-  updateScreen,
   updateScreenGroup,
 } from '../../services/deviceService'
 import { canWrite, getStoredRole } from '../../services/authService'
@@ -72,18 +67,8 @@ function formatWs(wsStatus) {
   return map[wsStatus] || { color: 'default', label: String(wsStatus || '-') }
 }
 
-function formatDateTime(value) {
-  if (value == null) return '—'
-  const d = new Date(value)
-  return Number.isNaN(d.getTime()) ? String(value) : d.toLocaleString()
-}
-
-function formatResolution(width, height) {
-  if (width == null && height == null) return '—'
-  return `${width ?? '—'} × ${height ?? '—'}`
-}
-
 export default function DeviceManagementPage() {
+  const navigate = useNavigate()
   const canMutate = canWrite()
   const [screens, setScreens] = useState([])
   const [groups, setGroups] = useState([])
@@ -94,18 +79,10 @@ export default function DeviceManagementPage() {
   const [status, setStatus] = useState('ALL')
   const [groupId, setGroupId] = useState('ALL')
 
-  const [detailModalOpen, setDetailModalOpen] = useState(false)
-  const [detailId, setDetailId] = useState(null)
-  const [detailScreen, setDetailScreen] = useState(null)
-  const [detailLoading, setDetailLoading] = useState(false)
-
   const [createOpen, setCreateOpen] = useState(false)
-  const [editOpen, setEditOpen] = useState(false)
-  const [editingRecord, setEditingRecord] = useState(null)
   const [submitting, setSubmitting] = useState(false)
 
   const [createForm] = Form.useForm()
-  const [editForm] = Form.useForm()
   const [groupForm] = Form.useForm()
 
   const [groupModalOpen, setGroupModalOpen] = useState(false)
@@ -132,27 +109,6 @@ export default function DeviceManagementPage() {
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  useEffect(() => {
-    if (!detailModalOpen || detailId == null) return
-    let cancelled = false
-    async function run() {
-      setDetailLoading(true)
-      setDetailScreen(null)
-      try {
-        const row = await getScreen(detailId)
-        if (!cancelled) setDetailScreen(row)
-      } catch (e) {
-        if (!cancelled) message.error(getApiErrorMessage(e))
-      } finally {
-        if (!cancelled) setDetailLoading(false)
-      }
-    }
-    run()
-    return () => {
-      cancelled = true
-    }
-  }, [detailModalOpen, detailId])
 
   const filtered = useMemo(() => {
     const kw = keyword.trim().toLowerCase()
@@ -311,32 +267,12 @@ export default function DeviceManagementPage() {
     }
   }
 
-  const handleEdit = async () => {
-    if (!editingRecord?.id) return
-    try {
-      const values = await editForm.validateFields()
-      setSubmitting(true)
-      await updateScreen(editingRecord.id, { name: values.name.trim() })
-
-      const newGid = values.screenGroupId
-      const oldGid = editingRecord.screenGroupId ?? null
-      const n = newGid == null ? null : Number(newGid)
-      const o = oldGid == null ? null : Number(oldGid)
-      if (n !== o) {
-        await assignScreenGroup(editingRecord.id, { screenGroupId: n })
-      }
-
-      message.success('Screen updated')
-      setEditOpen(false)
-      setEditingRecord(null)
-      await loadData()
-    } catch (e) {
-      if (e?.errorFields) return
-      message.error(getApiErrorMessage(e))
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const openScreenDetail = useCallback(
+    (record) => {
+      navigate(`/devices/${record.id}`)
+    },
+    [navigate],
+  )
 
   const handleDelete = useCallback(
     async (id) => {
@@ -386,18 +322,6 @@ export default function DeviceManagementPage() {
     [loadData],
   )
 
-  const openEdit = useCallback(
-    (record) => {
-      setEditingRecord(record)
-      editForm.setFieldsValue({
-        name: record.name,
-        screenGroupId: record.screenGroupId ?? undefined,
-      })
-      setEditOpen(true)
-    },
-    [editForm],
-  )
-
   const columns = useMemo(
     () => [
       { title: 'name', dataIndex: 'name', key: 'name', ellipsis: true, width: 180 },
@@ -441,39 +365,15 @@ export default function DeviceManagementPage() {
         },
       },
       {
-        title: 'lastHeartbeatAt',
-        dataIndex: 'lastHeartbeatAt',
-        key: 'lastHeartbeatAt',
-        width: 170,
-        render: (v) => formatDateTime(v),
-      },
-      {
-        title: 'resolution',
-        key: 'resolution',
-        width: 120,
-        render: (_, r) => formatResolution(r.resolutionWidth, r.resolutionHeight),
-      },
-      { title: 'appVersion', dataIndex: 'appVersion', key: 'appVersion', width: 100, ellipsis: true },
-      {
         title: 'Actions',
         key: 'actions',
-        width: 260,
+        width: 220,
         fixed: 'right',
         render: (_, record) => (
           <Space wrap size="small">
-            <Button
-              size="small"
-              icon={<EyeOutlined />}
-              onClick={() => {
-                setDetailId(record.id)
-                setDetailModalOpen(true)
-              }}
-            >
-              View
-            </Button>
             {canMutate ? (
               <>
-                <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(record)}>
+                <Button size="small" icon={<EditOutlined />} onClick={() => openScreenDetail(record)}>
                   Edit
                 </Button>
                 <Button
@@ -496,12 +396,14 @@ export default function DeviceManagementPage() {
                   </Button>
                 </Popconfirm>
               </>
-            ) : null}
+            ) : (
+              <Typography.Text type="secondary">—</Typography.Text>
+            )}
           </Space>
         ),
       },
     ],
-    [canMutate, handleActivationCode, handleDelete, openEdit],
+    [canMutate, handleActivationCode, handleDelete, openScreenDetail],
   )
 
   return (
@@ -604,7 +506,7 @@ export default function DeviceManagementPage() {
               tableLayout="fixed"
               columns={columns}
               dataSource={filtered}
-              scroll={{ x: 1400 }}
+              scroll={{ x: 980 }}
               loading={loading}
               pagination={{ pageSize: 10, showSizeChanger: true, pageSizeOptions: [10, 20, 50] }}
             />
@@ -722,84 +624,6 @@ export default function DeviceManagementPage() {
             <Select allowClear placeholder="Optional group" options={groupOptions} optionFilterProp="label" showSearch />
           </Form.Item>
         </Form>
-      </Modal>
-
-      <Modal
-        title="Edit screen"
-        open={editOpen}
-        onCancel={() => {
-          setEditOpen(false)
-          setEditingRecord(null)
-        }}
-        onOk={handleEdit}
-        confirmLoading={submitting}
-        destroyOnHidden
-        width={480}
-      >
-        <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
-          Device code: {editingRecord?.deviceCode} (cannot change)
-        </Typography.Text>
-        <Form form={editForm} layout="vertical">
-          <Form.Item
-            label="name"
-            name="name"
-            rules={[
-              { required: true, message: 'Required' },
-              { max: 255, message: 'Max 255 characters' },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item label="screenGroupId" name="screenGroupId">
-            <Select allowClear placeholder="Optional group" options={groupOptions} optionFilterProp="label" showSearch />
-          </Form.Item>
-        </Form>
-      </Modal>
-
-      <Modal
-        title="Screen details"
-        open={detailModalOpen}
-        onCancel={() => {
-          setDetailModalOpen(false)
-          setDetailId(null)
-          setDetailScreen(null)
-        }}
-        footer={null}
-        width={560}
-        destroyOnHidden
-      >
-        {detailLoading ? (
-          <div style={{ padding: 48, textAlign: 'center' }}>
-            <Spin />
-          </div>
-        ) : detailScreen ? (
-          <Descriptions column={1} size="middle" bordered>
-            <Descriptions.Item label="id">{detailScreen.id}</Descriptions.Item>
-            <Descriptions.Item label="deviceCode">{detailScreen.deviceCode}</Descriptions.Item>
-            <Descriptions.Item label="name">{detailScreen.name}</Descriptions.Item>
-            <Descriptions.Item label="screenGroupId">{detailScreen.screenGroupId ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="screenGroupName">{detailScreen.screenGroupName ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="activationStatus">
-              <Tag color={formatActivation(detailScreen.activationStatus).color}>
-                {detailScreen.activationStatus}
-              </Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="status">
-              <Tag color={formatStatus(detailScreen.status).color}>{detailScreen.status}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="wsStatus">
-              <Tag color={formatWs(detailScreen.wsStatus).color}>{detailScreen.wsStatus}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label="lastHeartbeatAt">{formatDateTime(detailScreen.lastHeartbeatAt)}</Descriptions.Item>
-            <Descriptions.Item label="lastWsConnectedAt">{formatDateTime(detailScreen.lastWsConnectedAt)}</Descriptions.Item>
-            <Descriptions.Item label="lastWsMessageAt">{formatDateTime(detailScreen.lastWsMessageAt)}</Descriptions.Item>
-            <Descriptions.Item label="resolutionWidth">{detailScreen.resolutionWidth ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="resolutionHeight">{detailScreen.resolutionHeight ?? '—'}</Descriptions.Item>
-            <Descriptions.Item label="appVersion">{detailScreen.appVersion ?? '—'}</Descriptions.Item>
-          </Descriptions>
-        ) : (
-          <Typography.Text type="secondary">No data</Typography.Text>
-        )}
       </Modal>
     </div>
   )

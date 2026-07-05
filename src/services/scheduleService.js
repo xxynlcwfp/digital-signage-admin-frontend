@@ -256,4 +256,18 @@ export async function checkScheduleConflict(body) {
   return unwrapApiResponse(res)
 }
 
+/**
+ * Resolve the active schedule/config for a screen (read-only preview).
+ * @param {number|string} screenId
+ * @param {string} [at] ISO-8601 datetime
+ */
+export async function resolveScheduleForScreen(screenId, at) {
+  const params = { screenId }
+  if (at != null && String(at).trim() !== '') {
+    params.at = at
+  }
+  const res = await authApi.get('/api/admin/schedules/resolve', { params })
+  return unwrapApiResponse(res)
+}
+
 export { getApiErrorMessage }

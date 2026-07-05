@@ -22,7 +22,7 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'off',
       'react-refresh/only-export-components': [
         'error',
-        { allowExportNames: ['useAuth', 'mapApiMediaItem', 'useQuickCreateSchedule'] },
+        { allowExportNames: ['useAuth', 'mapApiMediaItem'] },
       ],
     },
   },

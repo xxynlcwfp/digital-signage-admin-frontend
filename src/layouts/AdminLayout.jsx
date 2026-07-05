@@ -13,9 +13,6 @@ import {
 } from '@ant-design/icons'
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../auth/AuthProvider'
-import QuickCreateScheduleFloater from '../components/schedule/QuickCreateScheduleFloater'
-import QuickScheduleWizard from '../components/schedule/QuickScheduleWizard'
-import { QuickCreateScheduleProvider } from '../context/QuickCreateScheduleContext'
 import { canManageUsers } from '../utils/permissions'
 import { getStoredRole, getStoredUsername } from '../services/authService'
 
@@ -78,8 +75,6 @@ export default function AdminLayout() {
   if (!isAuthenticated) return <Navigate to="/login" replace />
 
   return (
-    <QuickCreateScheduleProvider>
-    <>
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
         collapsible
@@ -186,11 +181,6 @@ export default function AdminLayout() {
         </Content>
       </Layout>
     </Layout>
-
-    <QuickScheduleWizard />
-    <QuickCreateScheduleFloater />
-    </>
-    </QuickCreateScheduleProvider>
   )
 }
 

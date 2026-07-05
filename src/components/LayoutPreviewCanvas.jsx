@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { Space, Tag, Typography } from 'antd'
 
 const COMPONENT_LABELS = [
@@ -21,21 +22,80 @@ function stackZ(r, index) {
   return Number.isFinite(n) ? n : index + 1
 }
 
-function mediaPreviewUrl(media) {
-  if (!media) return ''
-  const thumb = (media.thumbnailUrl || '').trim()
+function mediaKind(media, playlistMedia) {
+  const source = media || playlistMedia
+  return String(source?.type || source?.mediaType || '').toUpperCase()
+}
+
+function isVideoMedia(media, playlistMedia) {
+  if (mediaKind(media, playlistMedia) === 'VIDEO') return true
+  const url = (media?.fileUrl || playlistMedia?.fileUrl || '').trim().toLowerCase()
+  return /\.(mp4|webm|mov|m4v|m3u8)(\?|$)/.test(url)
+}
+
+function imagePreviewUrl(media, playlistMedia) {
+  if (isVideoMedia(media, playlistMedia)) return ''
+  const thumb = (media?.thumbnailUrl || playlistMedia?.thumbnailUrl || '').trim()
   if (thumb) return thumb
-  const file = (media.fileUrl || '').trim()
-  if (file && media.type === 'IMAGE') return file
+  const file = (media?.fileUrl || playlistMedia?.fileUrl || '').trim()
+  if (file) return file
   return ''
 }
 
+function videoPreviewUrl(media, playlistMedia) {
+  if (!isVideoMedia(media, playlistMedia)) return ''
+  return (media?.fileUrl || playlistMedia?.fileUrl || '').trim()
+}
+
+function PreviewVideo({ src }) {
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el || !src) return undefined
+
+    const tryPlay = () => {
+      const p = el.play()
+      if (p && typeof p.catch === 'function') {
+        p.catch(() => {})
+      }
+    }
+
+    el.load()
+    tryPlay()
+    el.addEventListener('canplay', tryPlay)
+    return () => {
+      el.removeEventListener('canplay', tryPlay)
+    }
+  }, [src])
+
+  return (
+    <video
+      ref={ref}
+      key={src}
+      src={src}
+      muted
+      autoPlay
+      loop
+      playsInline
+      preload="auto"
+      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+    />
+  )
+}
+
+/** Layout regions that render the active playlist item in preview. */
+function regionUsesPlaylistMedia(componentType) {
+  const t = String(componentType || 'PLAYLIST').toUpperCase()
+  return t === 'PLAYLIST' || t === 'VIDEO' || t === 'IMAGE' || t === 'CAROUSEL'
+}
+
 /**
- * Read-only layout canvas; optional playlist media fills PLAYLIST regions.
+ * Read-only layout canvas; optional playlist media fills media-driven regions.
  * @param {{
  *   layout: { resolutionWidth?: number, resolutionHeight?: number, regions?: unknown[] } | null
- *   playlistMedia?: { mediaId: number } | null
- *   mediaById?: Map<number, { thumbnailUrl?: string, fileUrl?: string, type?: string, title?: string }>
+ *   playlistMedia?: { mediaId?: number, mediaType?: string, fileUrl?: string, thumbnailUrl?: string } | null
+ *   mediaById?: Map<number, { thumbnailUrl?: string, fileUrl?: string, type?: string, mediaType?: string, title?: string, name?: string }>
  *   maxHeight?: string
  * }} props
  */
@@ -57,7 +117,9 @@ export default function LayoutPreviewCanvas({
   }
 
   const media = playlistMedia?.mediaId != null ? mediaById?.get(Number(playlistMedia.mediaId)) : null
-  const previewSrc = mediaPreviewUrl(media)
+  const videoSrc = videoPreviewUrl(media, playlistMedia)
+  const imageSrc = videoSrc ? '' : imagePreviewUrl(media, playlistMedia)
+  const showMedia = Boolean(videoSrc || imageSrc)
 
   return (
     <div
@@ -84,8 +146,7 @@ export default function LayoutPreviewCanvas({
           const rh0 = Math.max(1, Number(r?.height) || 1)
           const c0 = r?.components?.[0]
           const ctype = c0?.componentType || 'PLAYLIST'
-          const isPlaylist = ctype === 'PLAYLIST'
-          const showMedia = isPlaylist && previewSrc
+          const showRegionMedia = regionUsesPlaylistMedia(ctype) && showMedia
 
           return (
             <div
@@ -97,9 +158,9 @@ export default function LayoutPreviewCanvas({
                 width: `${(rw0 / baseW) * 100}%`,
                 height: `${(rh0 / baseH) * 100}%`,
                 borderRadius: 6,
-                border: showMedia ? '1px solid #3b82f6' : '1px dashed #64748b',
-                background: showMedia ? '#000' : 'rgba(255,255,255,0.08)',
-                padding: showMedia ? 0 : 6,
+                border: showRegionMedia ? '1px solid #3b82f6' : '1px dashed #64748b',
+                background: showRegionMedia ? '#000' : 'rgba(255,255,255,0.08)',
+                padding: showRegionMedia ? 0 : 6,
                 boxSizing: 'border-box',
                 zIndex: stackZ(r, i),
                 display: 'flex',
@@ -108,13 +169,17 @@ export default function LayoutPreviewCanvas({
                 overflow: 'hidden',
               }}
             >
-              {showMedia ? (
+              {showRegionMedia ? (
                 <>
-                  <img
-                    src={previewSrc}
-                    alt={media?.title || 'Media preview'}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-                  />
+                  {videoSrc ? (
+                    <PreviewVideo src={videoSrc} />
+                  ) : (
+                    <img
+                      src={imageSrc}
+                      alt={media?.title || media?.name || playlistMedia?.name || 'Media preview'}
+                      style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                    />
+                  )}
                   <div
                     style={{
                       position: 'absolute',
@@ -130,7 +195,9 @@ export default function LayoutPreviewCanvas({
                     <Tag color="blue" style={{ margin: 0, fontSize: 10, lineHeight: '18px' }}>
                       {r?.regionName || `Region ${i + 1}`}
                     </Tag>
-                    <Tag style={{ margin: 0, fontSize: 10, lineHeight: '18px' }}>Playlist</Tag>
+                    <Tag style={{ margin: 0, fontSize: 10, lineHeight: '18px' }}>
+                      {videoSrc ? 'Video' : componentLabel(ctype)}
+                    </Tag>
                   </div>
                 </>
               ) : (
